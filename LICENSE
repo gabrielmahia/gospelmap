@@ -1,0 +1,85 @@
+GospelMap - Dual Licensing Agreement
+
+AGPL-3.0 LICENSE (Primary)
+==========================
+
+Copyright © 2025 Gabriel Mahia
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+WHAT THIS MEANS:
+
+✅ Free for:
+   - NGOs and nonprofits
+   - Dioceses and parishes
+   - Grassroots communities
+   - Researchers and educators
+   - Individual use
+   
+✅ You can:
+   - Use the software
+   - Study how it works
+   - Modify it for your needs
+   - Deploy it for your community
+   
+✅ You must:
+   - Keep the source code open
+   - Credit the original authors
+   - Share improvements back (if running as web service)
+   - Not remove this license
+
+❌ Commercial use of the AGPL version requires licensing (see below)
+
+---
+
+COMMERCIAL LICENSE
+==================
+
+For proprietary or commercial use (companies, enterprises, etc.),
+a commercial license is available.
+
+Features:
+- Proprietary source code option
+- No requirement to share improvements
+- Dedicated support
+- Customization services
+
+Contact: gabriel@aikungfu.dev
+Subject: "Commercial License Inquiry"
+
+---
+
+FOREVER COMMUNITY-OWNED
+=======================
+
+Critical Commitment:
+
+1. NO VATICAN CLOSURE: No organization (including the Vatican)
+   can close or prevent access to this platform.
+
+2. FORKABILITY: Any community can fork GospelMap and run
+   independently if needed.
+
+3. DATA RIGHTS: Community data belongs to communities,
+   not to GospelMap maintainers.
+
+4. TERMINATION CLAUSE: If GospelMap becomes abandoned,
+   the code automatically transfers full rights to the
+   community stewardship committee.
+
+---
+
+See full AGPL-3.0 at: https://www.gnu.org/licenses/agpl-3.0.txt
