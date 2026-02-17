@@ -14,6 +14,18 @@ import plotly.express as px
 from datetime import datetime, date
 import math
 
+# Internal modules
+try:
+    from gospelmap.sheets_backend import submit as _submit_form, is_configured as _backend_ok
+except Exception:
+    def _submit_form(*a, **kw): return False
+    def _backend_ok(): return False
+
+try:
+    from gospelmap.accountability_data import DIOCESES, GLOBAL_STATS, DATA_SOURCES
+except Exception:
+    DIOCESES, GLOBAL_STATS, DATA_SOURCES = {}, {}, []
+
 st.set_page_config(
     page_title="GospelMap 🌍",
     page_icon="✝️",
@@ -394,74 +406,233 @@ elif page == "⚖️ Justice Network":
 # ═══════════════════════════════════════════════════════════════════════════════
 elif page == "📋 Accountability":
     st.title("📋 Accountability Dashboard")
-    st.markdown("Bishop and diocese transparency, finance, and synodality scores.")
+    st.markdown("Diocese transparency, finance, and synodality — grounded in real public statistics.")
     st.caption("*'Nothing hidden will not be revealed.'* — Luke 12:2")
 
-    # Diocese selector
-    diocese = st.selectbox("Select Diocese (Demo)", [
-        "Archdiocese of Nairobi, Kenya",
-        "Archdiocese of Los Angeles, USA",
-        "Archdiocese of Manila, Philippines",
-        "Diocese of Kampala, Uganda",
-        "Archdiocese of São Paulo, Brazil",
-    ])
+    # ── Data source ───────────────────────────────────────────────────────────
+    _diocese_list = list(DIOCESES.keys()) if DIOCESES else []
+    if not _diocese_list:
+        st.error("Accountability data module not loaded.")
+        st.stop()
 
-    # Demo data per diocese
-    demo_data = {
-        "Archdiocese of Nairobi, Kenya": {"fti":7.8,"pci":3.2,"justice":8.1,"synod":6.4,"women_pct":28,"youth_pct":35,"budget_pub":True,"priests":124,"parishes":180},
-        "Archdiocese of Los Angeles, USA": {"fti":6.2,"pci":5.8,"justice":6.5,"synod":5.2,"women_pct":18,"youth_pct":15,"budget_pub":True,"priests":540,"parishes":287},
-        "Archdiocese of Manila, Philippines": {"fti":5.1,"pci":4.4,"justice":7.2,"synod":5.8,"women_pct":22,"youth_pct":42,"budget_pub":False,"priests":410,"parishes":250},
-        "Diocese of Kampala, Uganda": {"fti":6.9,"pci":3.8,"justice":7.5,"synod":6.1,"women_pct":24,"youth_pct":38,"budget_pub":True,"priests":89,"parishes":95},
-        "Archdiocese of São Paulo, Brazil": {"fti":5.8,"pci":5.2,"justice":8.4,"synod":6.8,"women_pct":31,"youth_pct":28,"budget_pub":True,"priests":620,"parishes":340},
-    }
-    d = demo_data.get(diocese, list(demo_data.values())[0])
+    col_sel, col_qual = st.columns([3, 1])
+    with col_sel:
+        diocese = st.selectbox("Select Diocese", _diocese_list)
+    with col_qual:
+        d = DIOCESES[diocese]
+        badge = {"REAL":"🟢 Real data","EST":"🟡 Estimated","DEMO":"🔴 Demo"}
+        st.metric("Data Quality", badge.get(d.get("data_quality","DEMO"), "—"))
 
+    d = DIOCESES[diocese]
+
+    # ── Key indices ───────────────────────────────────────────────────────────
     st.divider()
     col1, col2, col3, col4 = st.columns(4)
     with col1: st.metric("Financial Transparency", f"{d['fti']:.1f}/10", "FTI")
-    with col2: st.metric("Pastoral Health", f"{10-d['pci']:.1f}/10", "Inverse PCI")
-    with col3: st.metric("Justice Engagement", f"{d['justice']:.1f}/10", "JCI")
-    with col4: st.metric("Synodality Score", f"{d['synod']:.1f}/10", "Walking Together")
+    with col2: st.metric("Pastoral Health",         f"{10-d['pci']:.1f}/10", "Inverse PCI")
+    with col3: st.metric("Justice Engagement",      f"{d['jci']:.1f}/10", "JCI")
+    with col4: st.metric("Synodality Score",         f"{d['synod_score']:.1f}/10", "Walking Together")
 
     st.divider()
-    col1, col2 = st.columns(2)
+    tab_overview, tab_stats, tab_finance, tab_synod, tab_submit = st.tabs([
+        "📊 Overview", "📈 Statistics", "💰 Finance", "🕊️ Synodality", "📝 Submit Data"
+    ])
 
-    with col1:
-        st.markdown("### 💰 Financial Accountability")
-        st.write(f"**Budget publicly available:** {'✅ Yes' if d['budget_pub'] else '❌ No'}")
-        # Stacked bar: budget allocation
-        alloc_labels = ["Pastoral","Material Aid","Formation","Admin","Building","Other"]
-        alloc_vals   = [40, 22, 18, 12, 5, 3]
-        fig = go.Figure(go.Bar(x=alloc_vals, y=alloc_labels, orientation='h',
-            marker_color=['#22c55e','#3b82f6','#8b5cf6','#f97316','#94a3b8','#cbd5e1']))
-        fig.update_layout(title="Budget Allocation %", height=280, margin=dict(l=0,r=0,t=40,b=0))
+    # ── Overview ──────────────────────────────────────────────────────────────
+    with tab_overview:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Leader:** {d['leader']}")
+            st.markdown(f"**Established:** {d['established']}")
+            st.markdown(f"**Catholics:** {d['catholics']:,}")
+            st.markdown(f"**Parishes:** {d['parishes']}")
+            st.markdown(f"**Diocesan Priests:** {d['priests_diocesan']}")
+            st.markdown(f"**Religious Priests:** {d['priests_religious']}")
+            st.markdown(f"**Permanent Deacons:** {d['permanent_deacons']}")
+        with col2:
+            st.markdown(f"**Women Religious:** {d['women_religious']:,}")
+            st.markdown(f"**Catechists:** {d['catechists']:,}")
+            st.markdown(f"**Schools:** {d['schools']}")
+            st.markdown(f"**Hospitals/Clinics:** {d['hospitals_clinics']}")
+            st.markdown(f"**Women in leadership:** {d['women_leadership_pct']}%")
+            st.markdown(f"**Youth engagement:** {d['youth_pct']}%")
+
+        st.divider()
+        # Radar chart of all 4 indices
+        fig = go.Figure(go.Scatterpolar(
+            r=[d['fti'], 10-d['pci'], d['jci'], d['synod_score'], d['fti']],
+            theta=["Transparency","Pastoral Health","Justice","Synodality","Transparency"],
+            fill="toself", line_color="#3b82f6", fillcolor="rgba(59,130,246,0.2)"
+        ))
+        fig.update_layout(polar=dict(radialaxis=dict(range=[0,10])),
+                          title="Ecosystem Health Radar", height=350)
         st.plotly_chart(fig, use_container_width=True)
 
-    with col2:
-        st.markdown("### 👥 Leadership & Representation")
-        st.metric("Women in leadership roles", f"{d['women_pct']}%")
-        st.metric("Youth (under 35) involved", f"{d['youth_pct']}%")
-        st.metric("Total priests", d["priests"])
-        st.metric("Parishes", d["parishes"])
-        if d['women_pct'] < 25:
-            st.markdown('<div class="warning-yellow">⚠️ Women in leadership below peer average (29%)</div>', unsafe_allow_html=True)
-        if d['youth_pct'] > 30:
-            st.markdown('<div class="health-green">✅ Strong youth engagement</div>', unsafe_allow_html=True)
+        if d['women_leadership_pct'] < 25:
+            st.markdown('<div class="warning-yellow">⚠️ Women in leadership below peer average (27%)</div>', unsafe_allow_html=True)
+        if d['youth_pct'] > 35:
+            st.markdown('<div class="health-green">✅ Strong youth engagement — above global average</div>', unsafe_allow_html=True)
+        elif d['youth_pct'] < 20:
+            st.markdown('<div class="crisis-red">⚠️ Low youth engagement — declining trend risk</div>', unsafe_allow_html=True)
 
-    st.divider()
-    st.markdown("### 🕊️ Synodality — Walking Together")
-    synod_items = {
-        "Listening sessions held (2023-2025)": "14",
-        "Changes made based on listening": "4",
-        "Lay involvement in hiring decisions": "Partial",
-        "LGBTQ+ outreach expanded": "Yes" if d["synod"] > 5 else "Not yet",
-        "Financial transparency increased": "Yes" if d["fti"] > 6 else "In progress",
-    }
-    for k, v in synod_items.items():
-        icon = "✅" if v in ("Yes","14","4","Partial") else "🔄"
-        st.write(f"{icon} **{k}:** {v}")
+    # ── Statistics ────────────────────────────────────────────────────────────
+    with tab_stats:
+        st.markdown("### Key Statistics vs. Global Averages")
+        if GLOBAL_STATS:
+            # Ratio: Catholics per parish
+            cpp = d['catholics'] // max(d['parishes'], 1)
+            global_cpp = GLOBAL_STATS['total_catholics'] // max(GLOBAL_STATS['total_parishes'], 1)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Catholics per Parish", f"{cpp:,}", f"Global avg: {global_cpp:,}")
+            with col2:
+                total_priests = d['priests_diocesan'] + d['priests_religious']
+                st.metric("Priests total", total_priests)
+            with col3:
+                cp_ratio = d['catholics'] // max(total_priests, 1)
+                st.metric("Catholics per Priest", f"{cp_ratio:,}")
 
-    st.caption("⚠️ DEMO: All data here is illustrative. Production connects to diocesan self-reporting + public records.")
+            st.divider()
+            # Bar comparison: this diocese vs global average
+            metrics = {
+                "Women Religious / 1000 Catholics": (
+                    round(d['women_religious'] / d['catholics'] * 1000, 2),
+                    round(GLOBAL_STATS['total_women_religious'] / GLOBAL_STATS['total_catholics'] * 1000, 2)
+                ),
+                "Catechists / 1000 Catholics": (
+                    round(d['catechists'] / d['catholics'] * 1000, 2),
+                    round(GLOBAL_STATS['total_catechists'] / GLOBAL_STATS['total_catholics'] * 1000, 2)
+                ),
+            }
+            for metric, (local, global_avg) in metrics.items():
+                fig = go.Figure(go.Bar(
+                    x=[local, global_avg],
+                    y=[diocese.split(",")[0], "Global Average"],
+                    orientation='h',
+                    marker_color=['#3b82f6','#94a3b8']
+                ))
+                fig.update_layout(title=metric, height=150,
+                                  margin=dict(l=0,r=0,t=35,b=0))
+                st.plotly_chart(fig, use_container_width=True)
+
+        st.caption(f"📚 **Sources:** {d.get('source','Vatican Yearbook 2022')}")
+        st.caption(f"**Data quality:** {d.get('data_quality','EST')} — Real = verified public source, EST = estimated from regional aggregates")
+
+        # Link to primary sources
+        st.markdown("### 🔗 Primary Data Sources")
+        for name, url, desc in DATA_SOURCES:
+            st.markdown(f"- [{name}]({url}) — {desc}")
+
+    # ── Finance ───────────────────────────────────────────────────────────────
+    with tab_finance:
+        st.markdown("### 💰 Financial Transparency")
+        bp = d.get('budget_public', False)
+        st.metric("Budget publicly available",
+                  "✅ Yes — full or partial disclosure" if bp else "❌ No public disclosure found",
+                  delta="Transparency signal")
+
+        if not bp:
+            st.markdown('<div class="crisis-red">⚠️ No public budget found for this diocese. Financial transparency is a trust signal — publish annually to score higher.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="health-green">✅ Some budget information publicly available.</div>', unsafe_allow_html=True)
+
+        st.markdown("#### Budget Allocation Model (Illustrative)")
+        st.caption("Real diocese budgets are rarely public. This shows the ideal allocation model for peer comparison.")
+        alloc = {"Pastoral & Sacraments":38,"Material Aid & Services":24,
+                 "Formation & Education":18,"Staff & Administration":11,
+                 "Building & Maintenance":6,"Justice & Advocacy":3}
+        fig = go.Figure(go.Bar(
+            x=list(alloc.values()), y=list(alloc.keys()), orientation='h',
+            marker_color=['#22c55e','#3b82f6','#8b5cf6','#f97316','#94a3b8','#ef4444']
+        ))
+        fig.update_layout(title="Recommended Budget Allocation %", height=300,
+                          margin=dict(l=0,r=0,t=40,b=0), xaxis_title="% of budget")
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown(f"**FTI Score: {d['fti']:.1f}/10**")
+        fti_breakdown = {
+            "Budget published": "2.5/2.5" if bp else "0/2.5",
+            "Allocation breakdown available": "TBC",
+            "External oversight exists": "TBC",
+            "Overhead under 20%": "TBC",
+        }
+        for k, v in fti_breakdown.items():
+            st.write(f"• {k}: {v}")
+
+    # ── Synodality ────────────────────────────────────────────────────────────
+    with tab_synod:
+        st.markdown("### 🕊️ Synodality — Walking Together")
+        st.markdown(f"**Synodality Score: {d['synod_score']:.1f}/10**")
+        st.progress(int(d['synod_score'] * 10))
+
+        synod_criteria = [
+            ("Listening sessions conducted (2021–2024)", d['synod_score'] > 4),
+            ("Lay involvement in parish governance",     d['synod_score'] > 5),
+            ("Women in meaningful leadership roles",     d['women_leadership_pct'] >= 25),
+            ("Youth representation in decision-making",  d['youth_pct'] >= 30),
+            ("Financial transparency to community",      bp),
+            ("Justice engagement documented",            d['jci'] >= 6),
+        ]
+        for criterion, met in synod_criteria:
+            icon = "✅" if met else "🔄"
+            st.write(f"{icon} {criterion}")
+
+        st.divider()
+        st.info("""
+**What is Synodality?**
+The 2021–2024 Synod on Synodality asked every diocese to listen deeply
+to its people — especially the marginalised. Synodality is not a meeting;
+it is a culture of mutual discernment. A high score means the diocese
+listens, changes, and includes.
+
+*"Walking together as the People of God."* — Pope Francis, 2021
+        """)
+
+    # ── Community Data Submission ─────────────────────────────────────────────
+    with tab_submit:
+        st.markdown("### 📝 Submit or Correct Data")
+        st.markdown("""
+GospelMap builds accountability from the ground up.
+**You can contribute data about this diocese:**
+- Correct inaccurate statistics
+- Add budget information
+- Document justice campaigns
+- Report abuse accountability gaps
+- Share synodality session records
+
+All submissions are reviewed before publication.
+        """)
+        col1, col2 = st.columns(2)
+        with col1:
+            sub_type   = st.selectbox("What are you submitting?", [
+                "Budget / financial data","Priest / parish count correction",
+                "Abuse accountability record","Justice campaign evidence",
+                "Synodality session record","Leadership representation data","Other"])
+            sub_source = st.text_input("Source URL or document name")
+            sub_year   = st.selectbox("Data year", list(range(2024, 2018, -1)))
+        with col2:
+            sub_name   = st.text_input("Your name (optional)")
+            sub_org    = st.text_input("Organisation (optional)")
+            sub_value  = st.text_area("Data / correction / evidence")
+
+        if st.button("Submit Data Contribution", type="primary"):
+            if sub_value and sub_source:
+                persisted = _submit_form("accountability_submission", {
+                    "diocese": diocese,
+                    "submission_type": sub_type,
+                    "source": sub_source,
+                    "year": sub_year,
+                    "contributor_name": sub_name,
+                    "contributor_org": sub_org,
+                    "value": sub_value,
+                })
+                if persisted:
+                    st.success("✅ Data submitted and saved to GospelMap review queue.")
+                else:
+                    st.success("✅ Submission recorded (session only — connect Google Sheets for persistence).")
+                    st.caption("See docs/SHEETS_SETUP.md to enable permanent storage.")
+            else:
+                st.warning("Please fill in both the data field and the source.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE: DIASPORA
@@ -470,133 +641,371 @@ elif page == "🌏 Diaspora":
     st.title("🌏 Diaspora Connection")
     st.markdown("Find your cultural community. Connect globally. Stay rooted locally.")
 
-    community = st.selectbox("Select your community", [
-        "Filipino Catholic Diaspora",
-        "Nigerian Catholic Diaspora",
-        "Kenyan / East African Diaspora",
-        "Korean Catholic Diaspora",
-        "Polish Catholic Diaspora",
-        "Brazilian Catholic Diaspora",
-        "Vietnamese Catholic Diaspora",
-    ])
-
-    diaspora_data = {
+    # Language → OSM search hints per community
+    _DIASPORA = {
         "Filipino Catholic Diaspora": {
             "origin": "Philippines", "total": "12M+",
             "concentrations": ["Middle East: 3.2M","North America: 4.8M","Europe: 1.2M","Australia: 800K"],
             "languages": ["Tagalog","Cebuano","Ilocano","English"],
+            "osm_hints": ["filipino","tagalog","santo nino","san pedro calungsod","birhen","our lady of antipolo"],
             "justice_focus": ["Nurse / healthcare worker wages","Domestic worker rights","OFW remittance ethics","Anti-trafficking"],
-            "parishes": "8,200+ Filipino communities globally",
+            "communities": "8,200+ Filipino communities globally",
+            "source": "Scalabrini Migration Center, CBCP 2022",
         },
         "Nigerian Catholic Diaspora": {
             "origin": "Nigeria", "total": "4M+",
             "concentrations": ["UK: 900K","USA: 800K","Europe: 600K","Canada: 400K"],
             "languages": ["English","Igbo","Yoruba","Hausa"],
+            "osm_hints": ["nigerian","igbo","yoruba","our lady queen of nigeria","st. charles lwanga"],
             "justice_focus": ["Healthcare worker brain drain","Remittance support","Anti-trafficking","Political asylum support"],
-            "parishes": "2,400+ Nigerian communities globally",
+            "communities": "2,400+ Nigerian communities globally",
+            "source": "Pew Research 2022, Catholic Secretariat Nigeria",
         },
         "Kenyan / East African Diaspora": {
             "origin": "Kenya / Uganda / Tanzania", "total": "2M+",
             "concentrations": ["UK: 450K","USA: 350K","Germany: 120K","Middle East: 200K"],
             "languages": ["Swahili","Kikuyu","Luo","English","Luganda"],
+            "osm_hints": ["swahili","kenyan","east african","st. joseph","holy family"],
             "justice_focus": ["Domestic worker rights","Living wage campaigns","Political asylum","Climate justice"],
-            "parishes": "1,100+ East African communities globally",
+            "communities": "1,100+ East African communities globally",
+            "source": "Kenya National Bureau of Statistics, AMECEA 2022",
+        },
+        "Korean Catholic Diaspora": {
+            "origin": "South Korea", "total": "1.5M+",
+            "concentrations": ["USA: 600K","Japan: 300K","China: 200K","Australia: 120K"],
+            "languages": ["Korean","English"],
+            "osm_hints": ["korean","한인","st. andrew kim","korean catholic"],
+            "justice_focus": ["Migrant worker rights","Reunification advocacy","Social welfare"],
+            "communities": "1,800+ Korean communities globally",
+            "source": "CBCK 2022, Pew Research",
+        },
+        "Polish Catholic Diaspora": {
+            "origin": "Poland", "total": "20M+",
+            "concentrations": ["USA: 9.5M","Germany: 2.2M","UK: 800K","France: 600K"],
+            "languages": ["Polish","English"],
+            "osm_hints": ["polish","polska","st. stanislaus","sw. maksymilian","częstochowa"],
+            "justice_focus": ["Migrant worker rights","Community preservation","Political asylum"],
+            "communities": "4,200+ Polish communities globally",
+            "source": "Polish Bishops' Conference, Pew Research 2022",
+        },
+        "Brazilian Catholic Diaspora": {
+            "origin": "Brazil", "total": "3M+",
+            "concentrations": ["USA: 1.4M","Portugal: 600K","Japan: 300K","UK: 200K"],
+            "languages": ["Portuguese","English"],
+            "osm_hints": ["brasileira","nossa senhora","são","brazil","scalabrini"],
+            "justice_focus": ["Migrant worker rights","Land rights solidarity","Anti-trafficking"],
+            "communities": "1,600+ Brazilian communities globally",
+            "source": "CNBB 2022, Scalabrini Center",
+        },
+        "Vietnamese Catholic Diaspora": {
+            "origin": "Vietnam", "total": "3M+",
+            "concentrations": ["USA: 1.5M","Australia: 350K","France: 300K","Germany: 200K"],
+            "languages": ["Vietnamese","English","French"],
+            "osm_hints": ["vietnamese","viet","la vang","our lady of lavang","blessed andrew phu yen"],
+            "justice_focus": ["Refugee rights","Human trafficking","Political asylum","Worker rights"],
+            "communities": "2,100+ Vietnamese communities globally",
+            "source": "Pew Research 2022, Vietnamese Bishops Conference",
         },
     }
-    d = diaspora_data.get(community, list(diaspora_data.values())[0])
+
+    community = st.selectbox("Select your community", list(_DIASPORA.keys()))
+    d = _DIASPORA[community]
 
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Origin", d["origin"])
         st.metric("Global Community", d["total"])
-        st.markdown("**Concentrations:**")
+        st.markdown("**Global concentrations:**")
         for c in d["concentrations"]:
             st.write(f"• {c}")
+        st.caption(f"📚 Source: {d['source']}")
     with col2:
         st.markdown("**Languages:**")
         st.write(", ".join(d["languages"]))
-        st.metric("Catholic Communities", d["parishes"])
-        st.markdown("**Justice Focus Areas:**")
+        st.metric("Communities worldwide", d["communities"])
+        st.markdown("**Justice focus areas:**")
         for j in d["justice_focus"]:
             st.write(f"⚖️ {j}")
 
     st.divider()
     st.markdown("### 🔍 Find Community Near You")
-    your_city = st.text_input("Your city", placeholder="London / Dubai / Toronto")
-    if st.button("Find My Community"):
-        if your_city:
-            st.success(f"✅ Searching for {community} communities in {your_city}...")
-            st.info("🔧 **Production feature:** This will search GospelMap's parish database filtered by cultural community, language, and Mass schedule. Demo shows search capability.")
-            # Could wire to OSM search filtered by church name patterns
+    st.caption("Live search: finds Catholic churches likely serving your community via OpenStreetMap + name pattern matching")
+
+    col1, col2 = st.columns([2,1])
+    with col1:
+        your_city    = st.text_input("Your city", placeholder="London / Dubai / Toronto / Chicago")
+        your_country = st.text_input("Country (optional)", placeholder="UK / UAE / Canada / USA")
+    with col2:
+        st.markdown("**What we search for:**")
+        for hint in d["osm_hints"][:4]:
+            st.write(f"• `{hint}`")
+
+    if st.button("🔍 Find My Community", type="primary"):
+        if your_city.strip():
+            # Strategy: search OSM for the city, then filter + supplement with community-specific search
+            with st.spinner(f"Searching for {community} churches in {your_city}..."):
+                try:
+                    from gospelmap.church_search import search_by_city, _overpass, _geocode, _parse_element, Church
+                    import math as _math
+
+                    # Primary: general Catholic search in city
+                    all_churches = search_by_city(your_city.strip(), your_country.strip() or None, limit=20)
+
+                    # Secondary: targeted search using community name hints
+                    def _hint_search(city, country, hints, limit=10):
+                        """Search for churches matching community-specific name patterns."""
+                        hint_pattern = "|".join(hints[:5])
+                        area_query = f"""
+                        [out:json][timeout:35];
+                        area["name"~"{city}",i]["admin_level"~"4|5|6|7|8"]->.a;
+                        (
+                          node["amenity"="place_of_worship"]["name"~"{hint_pattern}",i](area.a);
+                          way["amenity"="place_of_worship"]["name"~"{hint_pattern}",i](area.a);
+                        );
+                        out center {limit};
+                        """
+                        data = _overpass(area_query, timeout=40)
+                        results = []
+                        seen = set()
+                        for elem in data.get("elements", []):
+                            c = _parse_element(elem)
+                            if c and c.name.lower() not in seen:
+                                c.city = c.city or city.title()
+                                results.append(c)
+                                seen.add(c.name.lower())
+                        return results
+
+                    community_specific = _hint_search(
+                        your_city.strip(),
+                        your_country.strip() or "",
+                        d["osm_hints"]
+                    )
+
+                    # Merge: community-specific first, then general
+                    seen_names = {c.name.lower() for c in community_specific}
+                    merged = list(community_specific)
+                    for c in all_churches:
+                        if c.name.lower() not in seen_names:
+                            merged.append(c)
+                            seen_names.add(c.name.lower())
+
+                    # Tag community-specific results
+                    cs_names = {c.name.lower() for c in community_specific}
+
+                except Exception as e:
+                    merged = []
+                    cs_names = set()
+                    st.error(f"Search error: {e}")
+
+            if not merged:
+                st.warning(f"No churches found in {your_city}. Try a larger nearby city.")
+            else:
+                if community_specific:
+                    st.success(f"Found **{len(community_specific)} community-specific** + **{len(merged)-len(community_specific)} general Catholic** churches in {your_city}")
+                else:
+                    st.success(f"Found **{len(merged)} Catholic churches** in {your_city} — no community-specific results, showing all Catholic parishes")
+                    st.info(f"💡 No churches with {community} name patterns found. Diaspora communities often worship at existing parishes without community-specific names. Contact these parishes about their community Mass schedules.")
+
+                st.divider()
+                for i, c in enumerate(merged[:12], 1):
+                    is_community = c.name.lower() in cs_names
+                    col1, col2, col3 = st.columns([3,1,1])
+                    with col1:
+                        label = f"🌟 {c.name}" if is_community else c.name
+                        st.markdown(f"**{i}. {label}**")
+                        if is_community:
+                            st.caption(f"✨ Likely serves {community.split()[0]} community")
+                        if c.address:
+                            st.caption(f"📍 {c.address}")
+                    with col2:
+                        if c.distance_km:
+                            st.metric("Distance", f"{c.distance_km:.1f} km")
+                    with col3:
+                        gmaps = f"https://www.google.com/maps?q={c.latitude},{c.longitude}"
+                        st.markdown(f"[📍 Maps]({gmaps})")
+                    if c.phone:
+                        st.caption(f"📞 {c.phone}")
+                    st.divider()
         else:
-            st.warning("Enter your city")
+            st.warning("Enter your city to search")
 
     st.divider()
     st.markdown("### 🤝 Connect to Justice Network")
-    st.write("Your diaspora community's justice campaigns:")
+    st.write("Active campaigns connected to your community:")
     for j in d["justice_focus"]:
-        col1, col2 = st.columns([3,1])
+        col1, col2 = st.columns([4,1])
         with col1:
             st.write(f"⚖️ {j}")
         with col2:
-            st.button("Join", key=f"join_{j[:15]}")
+            if st.button("Join", key=f"join_dia_{j[:18]}"):
+                _submit_form("justice_join", {"community": community, "campaign": j})
+                st.success("✅ Joined!")
+
+    st.divider()
+    st.markdown("### 📝 Register Your Community")
+    st.caption("Know of a diaspora community not listed? Add it to GospelMap.")
+    with st.expander("Register a community"):
+        reg_c1, reg_c2 = st.columns(2)
+        with reg_c1:
+            reg_name    = st.text_input("Community name")
+            reg_city    = st.text_input("City / Region")
+            reg_country = st.text_input("Country")
+        with reg_c2:
+            reg_lang    = st.text_input("Primary language(s)")
+            reg_parish  = st.text_input("Host parish (if known)")
+            reg_contact = st.text_input("Contact (optional)")
+        if st.button("Register Community"):
+            if reg_name and reg_city:
+                persisted = _submit_form("diaspora_community", {
+                    "community_name": reg_name, "city": reg_city,
+                    "country": reg_country, "languages": reg_lang,
+                    "host_parish": reg_parish, "contact": reg_contact,
+                })
+                msg = "✅ Community registered and saved." if persisted else "✅ Community noted (session only — connect Google Sheets to persist)."
+                st.success(msg)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE: CRISIS RESPONSE
 # ═══════════════════════════════════════════════════════════════════════════════
 elif page == "🆘 Crisis Response":
     st.title("🆘 Crisis Response Coordination")
-    st.markdown("Real-time coordination of emergency response through parish networks.")
+    st.markdown("Real-time coordination of emergency response through the global parish network.")
+
+    # Persistence status banner
+    if _backend_ok():
+        st.markdown('<div class="health-green">🟢 <strong>Live mode:</strong> All submissions persist to Google Sheets coordination database.</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="warning-yellow">🟡 <strong>Session mode:</strong> Submissions visible this session only. See <code>docs/SHEETS_SETUP.md</code> to enable persistence.</div>', unsafe_allow_html=True)
 
     st.divider()
-    st.markdown("### 🔴 Active Crises")
+    st.markdown("### 🔴 Active Crises (Demo Baseline)")
+    st.caption("These illustrative crises show coordination capability. Community-submitted crises appear below after submission.")
 
     crises = [
-        {"name":"Flooding — Lake Victoria Region","location":"Kenya / Uganda / Tanzania","severity":7.8,"parishes":450,"volunteers":2300,"shelters":15,"status":"🔴 ACTIVE"},
-        {"name":"Refugee Surge — Horn of Africa","location":"Ethiopia / Somalia / Kenya border","severity":8.2,"parishes":230,"volunteers":1200,"shelters":8,"status":"🔴 ACTIVE"},
-        {"name":"Post-Cyclone Recovery — Mozambique","location":"Central Mozambique","severity":6.4,"parishes":120,"volunteers":890,"shelters":12,"status":"🟡 RECOVERY"},
+        {"name":"Flooding — Lake Victoria Region","location":"Kenya / Uganda / Tanzania",
+         "severity":7.8,"parishes":450,"volunteers":2300,"shelters":15,"status":"🔴 ACTIVE"},
+        {"name":"Refugee Surge — Horn of Africa","location":"Ethiopia / Somalia / Kenya border",
+         "severity":8.2,"parishes":230,"volunteers":1200,"shelters":8,"status":"🔴 ACTIVE"},
+        {"name":"Post-Cyclone Recovery — Mozambique","location":"Central Mozambique",
+         "severity":6.4,"parishes":120,"volunteers":890,"shelters":12,"status":"🟡 RECOVERY"},
     ]
 
-    for crisis in crises:
+    # Session state for submitted crises
+    if "submitted_crises" not in st.session_state:
+        st.session_state.submitted_crises = []
+    if "registered_aid" not in st.session_state:
+        st.session_state.registered_aid = []
+
+    # Show submitted crises (this session)
+    all_crises = crises + st.session_state.submitted_crises
+    for crisis in all_crises:
         col1, col2, col3 = st.columns([3,1,1])
         with col1:
-            st.markdown(f"#### {crisis['status']} {crisis['name']}")
+            label = crisis.get("status", "🔵 SUBMITTED")
+            st.markdown(f"#### {label} {crisis['name']}")
             st.caption(f"📍 {crisis['location']}")
-            st.write(f"Parishes coordinating: **{crisis['parishes']}** · Volunteers: **{crisis['volunteers']:,}** · Shelter sites: **{crisis['shelters']}**")
+            if "parishes" in crisis:
+                st.write(f"Parishes: **{crisis['parishes']}** · Volunteers: **{crisis.get('volunteers',0):,}** · Shelters: **{crisis.get('shelters',0)}**")
+            else:
+                st.write(f"Type: **{crisis.get('type','Unknown')}** · Affected: **{crisis.get('affected',0):,}** people")
+                if crisis.get("needs"):
+                    st.write(f"Needs: {crisis['needs']}")
         with col2:
-            st.metric("Severity", f"{crisis['severity']}/10")
+            st.metric("Severity", f"{crisis.get('severity', crisis.get('cr_severity', '?'))}/10")
         with col3:
-            if st.button(f"Coordinate", key=f"crisis_{crisis['name'][:10]}"):
-                st.success("✅ You're now linked to the coordination network for this crisis.")
+            if st.button("Coordinate", key=f"coord_{crisis['name'][:12]}"):
+                st.success("✅ Linked to coordination network.")
         st.divider()
 
+    # ── REPORT A CRISIS ───────────────────────────────────────────────────────
     st.markdown("### 🆘 Report a New Crisis")
-    with st.expander("Submit crisis report for network coordination"):
+    with st.expander("Submit crisis report for network coordination", expanded=False):
         c1, c2 = st.columns(2)
         with c1:
-            cr_name     = st.text_input("Crisis name")
-            cr_location = st.text_input("Location (country / region)")
-            cr_type     = st.selectbox("Type", ["Flooding","Drought","Refugee surge","Earthquake","Conflict displacement","Disease outbreak","Food crisis","Other"])
+            cr_name     = st.text_input("Crisis name*", key="cr_name")
+            cr_location = st.text_input("Location (country / region)*", key="cr_loc")
+            cr_type     = st.selectbox("Type", ["Flooding","Drought","Refugee surge",
+                          "Earthquake","Conflict displacement","Disease outbreak","Food crisis","Other"])
         with c2:
-            cr_severity = st.slider("Estimated severity (1-10)", 1, 10, 5)
-            cr_affected = st.number_input("People affected (estimate)", 0, 10000000, 1000)
-            cr_notes    = st.text_area("Description + immediate needs")
-        if st.button("Submit Crisis Report"):
-            if cr_name and cr_location:
-                st.success(f"✅ Crisis report submitted. GospelMap will coordinate parish response in {cr_location}.")
+            cr_severity = st.slider("Estimated severity (1–10)", 1, 10, 5, key="cr_sev")
+            cr_affected = st.number_input("People affected (estimate)", 0, 10_000_000, 1000, key="cr_aff")
+            cr_needs    = st.text_area("Description + immediate needs", key="cr_needs")
 
-    st.divider()
+        if st.button("Submit Crisis Report", type="primary", key="submit_cr"):
+            if cr_name and cr_location:
+                payload = {
+                    "name": cr_name, "location": cr_location,
+                    "type": cr_type, "severity": cr_severity,
+                    "affected": cr_affected, "needs": cr_needs,
+                    "reported_at": datetime.utcnow().isoformat(),
+                }
+                persisted = _submit_form("crisis_report", payload)
+                st.session_state.submitted_crises.append({
+                    "name": cr_name, "location": cr_location,
+                    "severity": cr_severity, "type": cr_type,
+                    "affected": cr_affected, "needs": cr_needs,
+                    "status": "🔵 SUBMITTED",
+                })
+                if persisted:
+                    st.success(f"✅ Crisis '{cr_name}' submitted and saved to coordination database.")
+                else:
+                    st.success(f"✅ Crisis '{cr_name}' added to coordination board this session.")
+                st.rerun()
+            else:
+                st.warning("Crisis name and location are required.")
+
+    # ── OFFER AID ─────────────────────────────────────────────────────────────
     st.markdown("### 📋 Offer Aid Capacity")
-    c1, c2 = st.columns(2)
-    with c1:
-        aid_parish = st.text_input("Your parish / organisation")
-        aid_city   = st.text_input("Your location")
-    with c2:
-        aid_types  = st.multiselect("What can you offer?", ["Shelter (beds)","Food","Medical","Transport","Volunteer hours","Funds","Prayer / spiritual support"])
-        aid_notes  = st.text_area("Additional notes")
-    if st.button("Register Aid Capacity"):
-        if aid_parish:
-            st.success(f"✅ {aid_parish} registered as aid provider. You'll be matched to nearest active crisis.")
+    col1, col2 = st.columns(2)
+    with col1:
+        aid_parish  = st.text_input("Your parish / organisation*", key="aid_par")
+        aid_city    = st.text_input("Your location*", key="aid_city")
+        aid_contact = st.text_input("Contact email or phone", key="aid_contact")
+    with col2:
+        aid_types   = st.multiselect("What can you offer?",
+                      ["Shelter (beds)","Food","Medical","Transport",
+                       "Volunteer hours","Funds","Legal support","Prayer / spiritual support"],
+                      key="aid_types")
+        aid_capacity= st.text_input("Capacity (e.g. 20 beds, 50 meals/day)", key="aid_cap")
+        aid_notes   = st.text_area("Additional notes", key="aid_notes")
+
+    if st.button("Register Aid Capacity", type="primary", key="submit_aid"):
+        if aid_parish and aid_city:
+            payload = {
+                "parish": aid_parish, "city": aid_city, "contact": aid_contact,
+                "aid_types": aid_types, "capacity": aid_capacity, "notes": aid_notes,
+                "registered_at": datetime.utcnow().isoformat(),
+            }
+            persisted = _submit_form("aid_capacity", payload)
+            st.session_state.registered_aid.append(payload)
+            if persisted:
+                st.success(f"✅ **{aid_parish}** registered as aid provider — saved to coordination database. You'll be matched to nearest active crisis.")
+            else:
+                st.success(f"✅ **{aid_parish}** registered (session only). Connect Google Sheets to persist across sessions.")
+        else:
+            st.warning("Parish name and location are required.")
+
+    # Show registered aid providers this session
+    if st.session_state.registered_aid:
+        st.divider()
+        st.markdown(f"**Aid providers registered this session ({len(st.session_state.registered_aid)}):**")
+        for a in st.session_state.registered_aid:
+            st.write(f"• **{a['parish']}** ({a['city']}) — {', '.join(a.get('aid_types', []))}")
+
+    # ── SETUP BANNER ──────────────────────────────────────────────────────────
+    if not _backend_ok():
+        st.divider()
+        with st.expander("🔧 Enable Persistent Storage (5 min setup)"):
+            st.markdown("""
+**To make all form submissions persist permanently:**
+
+1. Follow `docs/SHEETS_SETUP.md` — creates a free Google Sheets backend
+2. Add `SHEETS_ENDPOINT = "your-apps-script-url"` to Streamlit Cloud secrets
+3. All crisis reports, aid registrations, and accountability submissions  
+   will persist in your Google Sheet — no database, no server, free forever.
+
+**Estimated setup time:** 5 minutes
+            """)
 
 st.markdown("---")
 st.caption("GospelMap | AGPL-3.0 | [GitHub](https://github.com/gabrielmahia/gospelmap) | contact@aikungfu.dev | CC BY-NC-ND 4.0")
