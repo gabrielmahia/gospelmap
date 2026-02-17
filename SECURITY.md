@@ -8,7 +8,7 @@ If you discover a security vulnerability in GospelMap:
 
 Email directly to:
 ```
-gabriel@aikungfu.dev
+contact@aikungfu.dev
 ```
 
 Include:
