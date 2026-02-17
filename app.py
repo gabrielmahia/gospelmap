@@ -36,16 +36,57 @@ st.set_page_config(
 # ── Shared CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-.gm-hero { font-size:2.4em; font-weight:800; color:#1a3a5c; margin-bottom:0.3rem; }
-.gm-sub  { font-size:1.1em; color:#5a7290; margin-bottom:1.5rem; }
-.gm-card {
-    border:1px solid #e0e7ef; border-radius:10px;
-    padding:1.2rem 1.4rem; margin-bottom:1rem;
-    background:#f8fbff;
+/* ── Theme-aware: works in both light and dark mode ── */
+
+/* Hero text: use Streamlit's own text color token */
+.gm-hero {
+    font-size:2.4em; font-weight:800; margin-bottom:0.3rem;
+    color: var(--text-color, #1a3a5c);
 }
-.crisis-red    { background:#fee2e2; border-left:4px solid #ef4444; padding:.8rem 1rem; border-radius:6px; margin:.5rem 0; }
-.health-green  { background:#dcfce7; border-left:4px solid #22c55e; padding:.8rem 1rem; border-radius:6px; margin:.5rem 0; }
-.warning-yellow{ background:#fef9c3; border-left:4px solid #eab308; padding:.8rem 1rem; border-radius:6px; margin:.5rem 0; }
+.gm-sub {
+    font-size:1.1em; margin-bottom:1.5rem;
+    color: var(--text-color, #5a7290);
+    opacity: 0.75;
+}
+
+/* Card: no fixed background — use transparent with just a border */
+.gm-card {
+    border:1px solid rgba(128,128,128,0.25);
+    border-radius:10px;
+    padding:1.2rem 1.4rem;
+    margin-bottom:1rem;
+}
+
+/* Status banners: border-left accent only, transparent background.
+   Works on any background color — light or dark. */
+.crisis-red {
+    border-left:4px solid #ef4444;
+    padding:.8rem 1rem;
+    border-radius:0 6px 6px 0;
+    margin:.5rem 0;
+    background: rgba(239,68,68,0.12);
+}
+.health-green {
+    border-left:4px solid #22c55e;
+    padding:.8rem 1rem;
+    border-radius:0 6px 6px 0;
+    margin:.5rem 0;
+    background: rgba(34,197,94,0.12);
+}
+.warning-yellow {
+    border-left:4px solid #eab308;
+    padding:.8rem 1rem;
+    border-radius:0 6px 6px 0;
+    margin:.5rem 0;
+    background: rgba(234,179,8,0.12);
+}
+
+/* Dark mode overrides: boost rgba alpha slightly for visibility */
+@media (prefers-color-scheme: dark) {
+    .crisis-red     { background: rgba(239,68,68,0.20); }
+    .health-green   { background: rgba(34,197,94,0.20); }
+    .warning-yellow { background: rgba(234,179,8,0.20); }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,6 +111,14 @@ with st.sidebar:
     st.metric("Parishes Mapped", "5,000+")
     st.metric("Countries", "150+")
     st.metric("Justice Campaigns", "50+")
+    st.divider()
+    st.markdown("### 🔗 Parish Tools")
+    st.markdown("""
+**Running a parish?**  
+[![Catholic Spiritual OS](https://img.shields.io/badge/Catholic%20Spiritual%20OS-Parish%20Tools-blue)](https://catholicparishsteward.streamlit.app)
+
+[→ Open Catholic Spiritual OS](https://catholicparishsteward.streamlit.app) — sacraments, pastoral care, stewardship & more
+""")
     st.divider()
     st.caption("🟢 **Demo Mode** — Spiritual content live, parish metrics illustrative")
     st.caption("AGPL-3.0 | community-owned forever")
@@ -284,28 +333,87 @@ elif page == "📊 Ecosystem Health":
             st.metric("Financial Transparency Index", f"{score:.1f} / 10", level)
 
     st.divider()
-    st.markdown("### 🗺️ Regional Health Overview (Demo Data)")
+    st.markdown("### 🗺️ Regional Health Overview")
 
-    # Radar chart of 4 indices for sample parishes
-    regions = ["Nairobi Central", "Manila North", "São Paulo East", "Rome Historic", "Chicago West"]
-    pci_vals = [3.2, 4.1, 5.8, 2.8, 6.2]
-    mci_vals = [5.1, 6.3, 7.2, 2.1, 4.8]
-    jci_vals = [7.8, 5.2, 8.1, 3.4, 6.9]
-    fti_vals = [6.2, 5.8, 4.9, 8.1, 5.5]
+    # ── IP Geolocation (free, no key, no PII stored) ──────────────────────
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _detect_region() -> dict:
+        """Detect user's approximate region via ip-api.com (free tier, no key)."""
+        try:
+            r = requests.get("http://ip-api.com/json/?fields=country,countryCode,city,lat,lon",
+                             timeout=5)
+            if r.status_code == 200:
+                return r.json()
+        except Exception:
+            pass
+        return {}
 
+    geo = _detect_region()
+    user_country_code = geo.get("countryCode", "")
+    user_city         = geo.get("city", "")
+
+    # Region dataset — indexed by rough country/region tag for matching
+    REGIONAL_DATA = {
+        "Nairobi Central":  {"pci":3.2,"mci":5.1,"jci":7.8,"fti":6.2,"countries":["KE","TZ","RW","ET","UG","SO"]},
+        "Manila North":     {"pci":4.1,"mci":6.3,"jci":5.2,"fti":5.8,"countries":["PH","ID","TH","VN","MY","SG"]},
+        "São Paulo East":   {"pci":5.8,"mci":7.2,"jci":8.1,"fti":4.9,"countries":["BR","AR","CO","PE","CL","UY"]},
+        "Rome Historic":    {"pci":2.8,"mci":2.1,"jci":3.4,"fti":8.1,"countries":["IT","VA","ES","PT","FR","GR","HR"]},
+        "Chicago West":     {"pci":6.2,"mci":4.8,"jci":6.9,"fti":5.5,"countries":["US","CA","MX","AU","NZ","GB","IE","DE","PL"]},
+    }
+
+    # Find user's nearest region
+    def _nearest_region(code: str) -> str:
+        for name, d in REGIONAL_DATA.items():
+            if code in d["countries"]:
+                return name
+        return ""   # not found → no highlight
+
+    user_region = _nearest_region(user_country_code)
+
+    # Location badge
+    if user_city and user_country_code:
+        st.caption(f"📍 Detected location: **{user_city}, {user_country_code}**"
+                   + (f" — highlighting **{user_region}**" if user_region else "")
+                   + "  ·  *IP-based, approximate, not stored*")
+    else:
+        st.caption("📍 Location not detected — showing all regions equally")
+
+    # Build radar
     fig = go.Figure()
     categories = ["PCI (Crisis)", "MCI (Material)", "JCI (Justice)", "FTI (Transparency)"]
-    colors = ["#ef4444","#f97316","#22c55e","#3b82f6","#8b5cf6"]
-    for i, region in enumerate(regions):
-        vals = [pci_vals[i], mci_vals[i], jci_vals[i], fti_vals[i]]
-        fig.add_trace(go.Scatterpolar(r=vals+[vals[0]], theta=categories+[categories[0]],
-            fill="toself", name=region, line_color=colors[i], opacity=0.7))
-    fig.update_layout(polar=dict(radialaxis=dict(range=[0,10])),
-                      title="Ecosystem Health Radar — 5 Sample Parish Regions (DEMO)",
-                      height=450)
+    palette    = ["#ef4444","#f97316","#22c55e","#3b82f6","#8b5cf6"]
+
+    for i, (region, d) in enumerate(REGIONAL_DATA.items()):
+        vals        = [d["pci"], d["mci"], d["jci"], d["fti"]]
+        is_user     = (region == user_region)
+        line_width  = 4 if is_user else 1.5
+        opacity     = 1.0 if is_user else (0.35 if user_region else 0.7)
+        label       = f"★ {region} (your region)" if is_user else region
+        fig.add_trace(go.Scatterpolar(
+            r=vals + [vals[0]], theta=categories + [categories[0]],
+            fill="toself", name=label,
+            line=dict(color=palette[i], width=line_width),
+            fillcolor=f"rgba({int(palette[i][1:3],16)},{int(palette[i][3:5],16)},{int(palette[i][5:7],16)},{0.25 if is_user else 0.08})",
+            opacity=opacity,
+        ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(range=[0,10], tickfont=dict(size=10)),
+            bgcolor="rgba(0,0,0,0)",   # transparent — works in dark + light mode
+        ),
+        paper_bgcolor="rgba(0,0,0,0)", # transparent background
+        plot_bgcolor ="rgba(0,0,0,0)",
+        font=dict(color=None),         # inherit from Streamlit theme
+        title=("Ecosystem Health Radar" +
+               (f" — ★ {user_region} highlighted" if user_region else " — 5 Parish Regions") +
+               " (DEMO)"),
+        height=450,
+        legend=dict(bgcolor="rgba(0,0,0,0)"),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-    st.caption("DEMO: These indices use sample data. Connect your parish's real data via the Admin module.")
+    st.caption("⚠️ DEMO: Sample indices. Highlighted region = your approximate location. Connect real parish data via the Admin module.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE: JUSTICE NETWORK
