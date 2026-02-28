@@ -1,98 +1,23 @@
-# 🌍 GospelMap — Global Catholic Ecosystem Intelligence Platform
+# GospelMap → Superseded by Catholic Network Tools
 
-**Find your people. Measure justice. Hold leadership accountable.**
+> **This repository is archived.** All GospelMap features — and much more — are now part of **[Catholic Network Tools](https://github.com/gabrielmahia/catholic-network-tools)**.
 
-🔗 **Live:** https://gospelmap-global.streamlit.app  
-📁 **Code:** https://github.com/gabrielmahia/gospelmap
+## What happened
 
----
+GospelMap was the original prototype: Find a Church, Ecosystem Health, Justice Network, Accountability dashboard, and Global Diaspora.
 
-## ⚡ What You Can Do Right Now
+Catholic Network Tools (CNT) absorbed all of these features into a unified 8-page platform with a proper service layer, role-based access, liturgical engine, AI assistant with real-time search grounding, SMS integration, sacramental records, and parish governance tools.
 
-1. **Find a Catholic church** — real OpenStreetMap data, any city globally
-2. **Check ecosystem health** — calculate Pastoral Crisis Index for your parish
-3. **Explore justice campaigns** — living wage, refugee rights, housing globally
-4. **View accountability scores** — diocesan transparency, synodality, finances
-5. **Connect diaspora communities** — Filipino, Nigerian, East African and more
-6. **Coordinate crisis response** — refugee, disaster, emergency coordination
+## Where to go
 
----
-
-## 🎯 Core Features
-
-| Feature | Status | Data |
-|---------|--------|------|
-| 🔍 Find My Church | ✅ Live | OpenStreetMap (real, global) |
-| 📊 Ecosystem Health Indices | ✅ Live calculator | User input / demo |
-| ⚖️ Justice Network | ✅ Interactive | Demo campaigns |
-| 📋 Accountability Dashboard | ✅ Interactive | Demo data |
-| 🌏 Diaspora Connection | ✅ Interactive | Demo data |
-| 🆘 Crisis Response | ✅ Interactive | Demo data |
-
-**Demo Mode:** Clearly labeled. Church search is live and real. All other data illustrative.
+| What you want | Where to find it |
+|---|---|
+| Live platform | [catholicparishsteward.streamlit.app](https://catholicparishsteward.streamlit.app) |
+| Source code | [github.com/gabrielmahia/catholic-network-tools](https://github.com/gabrielmahia/catholic-network-tools) |
+| Find a Church | CNT → Find a Church page |
+| Ecosystem Health / Accountability | CNT → Ecosystem Health, Accountability pages |
+| Justice & Diaspora | CNT → Justice & Care, Global Diaspora pages |
 
 ---
 
-## 🏗️ Architecture (v1.0 — Deployable)
-
-```
-gospelmap/
-├── app.py                          ← Main app (multi-page, zero infra deps)
-├── gospelmap/
-│   ├── church_search.py            ← OSM-based real church finder
-│   ├── indices.py                  ← PCI, MCI, JCI, FTI calculators
-│   ├── data_models.py              ← Parish, Diocese, Campaign schemas
-│   └── catholic_network_tools_integration.py  ← Federation layer (future)
-├── requirements.txt                ← Only Streamlit-Cloud-compatible deps
-├── docs/                           ← Theology, data schema, governance
-└── [governance files]
-```
-
-**Design principles:**
-- Zero infrastructure dependencies (runs on Streamlit Cloud free tier)
-- OSM-powered real church search (multi-endpoint failover)
-- Progressive enhancement (demo → real data via env vars)
-- Federated by design (each parish owns its data)
-
----
-
-## 🚀 Deploy
-
-```bash
-git clone https://github.com/gabrielmahia/gospelmap
-cd gospelmap
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Streamlit Cloud: push to `main` → auto-deploys.
-
----
-
-## 📊 Index Framework
-
-```
-PASTORAL CRISIS INDEX (PCI)    — priest shortage, abuse, youth engagement
-MATERIAL CRISIS INDEX (MCI)    — food, housing, healthcare gaps
-JUSTICE CRISIS INDEX (JCI)     — wage campaigns, refugee, housing advocacy
-FINANCIAL TRANSPARENCY (FTI)   — budget public, overhead, accountability
-```
-
-All calculators are live — enter your parish's data and get real scores.
-
----
-
-## 🙏 Theological Foundation
-
-Grounded in Vatican II (Gaudium et Spes), Catholic Social Teaching,  
-and the conviction that *"nothing hidden will not be revealed."* — Luke 12:2
-
----
-
-## 📜 License
-
-CC BY-NC-ND 4.0 | contact@aikungfu.dev | community-owned
-
-## Security
-
-Vulnerabilities: email contact@aikungfu.dev — do NOT open public issues.
+*Archived February 2026. GospelMap is preserved here for historical reference.*
